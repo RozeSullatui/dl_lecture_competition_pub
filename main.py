@@ -137,7 +137,7 @@ class VQADataset(torch.utils.data.Dataset):
         image = self.transform(image)
         # question = np.zeros(len(self.idx2question) + 1)  # 未知語用の要素を追加
         # question_words = self.df["question"][idx].split(" ")
-         # 質問文をtokenize
+        # 質問文をtokenize
         # for word in question_words:
         #     try:
         #         question[self.question2idx[word]] = 1  # one-hot表現に変換
@@ -158,8 +158,7 @@ class VQADataset(torch.utils.data.Dataset):
         if self.answer:
             answers = [self.answer2idx[process_text(answer["answer"])] for answer in self.df["answers"][idx]]
             mode_answer_idx = mode(answers)
-
-            return image, question['input_ids'].squeeze(), question['attention_mask'].squeeze(), torch.Tensor(answers), int(mode_answer_idx)
+            return image, question['input_ids'].squeeze(), question['attention_mask'].squeeze(), torch.tensor(answers), torch.tensor(mode_answer_idx)
         else:
             return image, question['input_ids'].squeeze(), question['attention_mask'].squeeze()
 
@@ -390,11 +389,14 @@ def train(model, dataloader, optimizer, criterion, device):
 
     # return total_loss / len(dataloader), total_acc / len(dataloader), simple_acc / len(dataloader), time.time() - start
     for image, input_ids, attention_mask, answers, mode_answer in dataloader:
-        image, input_ids, attention_mask, answers, mode_answer = \
-            image.to(device), input_ids.to(device), attention_mask.to(device), answers.to(device), mode_answer.to(device)
+        image = image.to(device)
+        input_ids = input_ids.to(device)
+        attention_mask = attention_mask.to(device)
+        answers = answers.to(device)
+        mode_answer = mode_answer.to(device)
 
         pred = model(image, input_ids, attention_mask)
-        loss = criterion(pred, mode_answer.squeeze())
+        loss = criterion(pred, mode_answer.view(-1))
 
         optimizer.zero_grad()
         loss.backward()
@@ -428,11 +430,14 @@ def eval(model, dataloader, optimizer, criterion, device):
 
     # return total_loss / len(dataloader), total_acc / len(dataloader), simple_acc / len(dataloader), time.time() - start
     for image, input_ids, attention_mask, answers, mode_answer in dataloader:
-        image, input_ids, attention_mask, answers, mode_answer = \
-            image.to(device), input_ids.to(device), attention_mask.to(device), answers.to(device), mode_answer.to(device)
+        image = image.to(device)
+        input_ids = input_ids.to(device)
+        attention_mask = attention_mask.to(device)
+        answers = answers.to(device)
+        mode_answer = mode_answer.to(device)
 
         pred = model(image, input_ids, attention_mask)
-        loss = criterion(pred, mode_answer.squeeze())
+        loss = criterion(pred, mode_answer.view(-1))
 
         total_loss += loss.item()
         total_acc += VQA_criterion(pred.argmax(1), answers)
@@ -465,13 +470,13 @@ def main():
     # test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False)
 
     # model = VQAModel(vocab_size=len(train_dataset.question2idx)+1, n_answer=len(train_dataset.answer2idx)).to(device)
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=32, shuffle=True)  # バッチサイズを小さくする
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=32, shuffle=True, drop_last=True)  # バッチサイズを小さくする
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False)
 
     model = VQAModel(n_answer=len(train_dataset.answer2idx)).to(device)
 
     # optimizer / criterion
-    num_epoch = 20
+    num_epoch = 25
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
 
@@ -487,9 +492,11 @@ def main():
     # 提出用ファイルの作成
     model.eval()
     submission = []
-    for image, question in test_loader:
-        image, question = image.to(device), question.to(device)
-        pred = model(image, question)
+    for image, input_ids, attention_mask in test_loader:
+        image = image.to(device)
+        input_ids = input_ids.to(device)
+        attention_mask = attention_mask.to(device)
+        pred = model(image, input_ids, attention_mask)
         pred = pred.argmax(1).cpu().item()
         submission.append(pred)
 

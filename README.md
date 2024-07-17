@@ -11,7 +11,7 @@ pip install -r requirements.txt
 - Dockerイメージのcudaバージョンについては，ご自身が利用するGPUに合わせて変更してください．
 ```bash
 docker build -t <イメージ名> .
-docker run -it -v $PWD:/workspace -w /workspace <イメージ名> bash
+docker run --gpus all -it -v ${PWD}:/workspace -w /workspace toudai_final bash
 ```
 
 ## ベースラインモデルを動かす

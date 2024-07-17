@@ -1,4 +1,5 @@
-FROM nvidia/cuda:12.1.0-cudnn8-devel-ubuntu22.04
+FROM nvidia/cuda:12.5.1-devel-ubuntu22.04
+
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt update
